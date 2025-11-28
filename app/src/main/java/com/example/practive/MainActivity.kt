@@ -5,6 +5,7 @@
 )
 
 package com.example.practive
+
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.example.practive.DeviceStorage
@@ -28,7 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.* // ⬅️ 這裡包含了 OptIn
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,16 +42,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.google.accompanist.permissions.* // ⬅️ 包含了 ExperimentalPermissionsApi
+import com.google.accompanist.permissions.*
 import com.google.mlkit.vision.barcode.BarcodeScanning
-//import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.annotation.SuppressLint
-import androidx.compose.foundation.rememberScrollState // ⬅️ [關鍵] 1. 請加入這個 import
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -284,14 +285,13 @@ fun ScanScreen(bleViewModel: BleViewModel = viewModel()) {
             .fillMaxSize()
             .background(Color(0xFF1E1E1E))
     ) {
-        // ＝＝＝＝＝ 這裡是您缺少的 when 區塊 ＝＝＝＝＝
         when {
             // 情況一：權限尚未授予
             !allPermissionsGranted -> {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(0.6f), // 佔 60% 空間
+                        .weight(0.6f),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -299,33 +299,33 @@ fun ScanScreen(bleViewModel: BleViewModel = viewModel()) {
                         modifier = Modifier.padding(32.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Warning, // 改成警告圖示
+                            imageVector = Icons.Default.Warning,
                             contentDescription = null,
                             modifier = Modifier.size(80.dp),
                             tint = Color.Gray
                         )
                         Spacer(modifier = Modifier.height(24.dp))
                         Text(
-                            text = "需要相機與藍牙權限", // 修改提示
+                            text = "需要相機與藍牙權限",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "掃描 QR Code 和連線藍牙需要權限", // 修改提示
+                            text = "掃描 QR Code 和連線藍牙需要權限",
                             fontSize = 14.sp,
                             color = Color.Gray,
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(24.dp))
                         Button(
-                            onClick = { permissionsState.launchMultiplePermissionRequest() }, // 修改 onClick
+                            onClick = { permissionsState.launchMultiplePermissionRequest() },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF2196F3)
                             )
                         ) {
-                            Text("授予必要權限") // 修改按鈕文字
+                            Text("授予必要權限")
                         }
                     }
                 }
@@ -336,17 +336,46 @@ fun ScanScreen(bleViewModel: BleViewModel = viewModel()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(0.6f) // 佔 60% 空間
+                        .weight(0.6f)
                 ) {
                     if (isCameraEnabled) {
+                        // ⬇️ [關鍵] 這裡使用了更新後的 CameraPreview 邏輯
                         CameraPreview(
                             onQRCodeScanned = { qrText ->
+                                // 1. 更新 UI
                                 scannedText = qrText
                                 if (!scanHistory.contains(qrText)) {
                                     scanHistory = listOf(qrText) + scanHistory.take(19)
                                 }
-                                // [關鍵] 傳送資料到 HM10
-                                bleViewModel.sendData(qrText)
+
+                                // 2. [核心邏輯] 解析 v3/v7 並打包成 32-bit 整數傳送
+                                try {
+                                    // Regex 解析: 找 v3 或 v7，後面接數字
+                                    val regex = Regex("(?i)(v3|v7)[:\\s-]?(\\d+)")
+                                    val match = regex.find(qrText)
+
+                                    if (match != null) {
+                                        val typeStr = match.groupValues[1].lowercase() // "v3" 或 "v7"
+                                        val valueStr = match.groupValues[2]            // "100"
+                                        val value = valueStr.toInt()
+
+                                        // 決定 ID (v3 -> 0x03, v7 -> 0x07)
+                                        val id = if (typeStr == "v3") 0x03 else 0x07
+
+                                        // 打包成 32-bit 整數 (Little Endian 的高位邏輯需配合 sendIntData)
+                                        val packet32Bit = (id shl 24) or (value and 0xFFFFFF)
+
+                                        // 透過藍牙傳送
+                                        bleViewModel.sendIntData(packet32Bit)
+
+                                        println("已傳送 32-bit 指令: $typeStr - $value")
+                                    } else {
+                                        // 掃描到非 v3/v7 格式，若有需要可在此傳送原始字串
+                                        // bleViewModel.sendData(qrText)
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
                             }
                         )
 
@@ -409,11 +438,11 @@ fun ScanScreen(bleViewModel: BleViewModel = viewModel()) {
 
         Divider(color = Color.Gray, thickness = 2.dp)
 
-        // ＝＝＝＝＝ 這是您的底部 40% 控制項 ＝＝＝＝＝
+        // 底部 40% 控制項
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.4f) // 佔 40% 空間
+                .weight(0.4f)
                 .padding(16.dp)
         ) {
             Row(
@@ -440,14 +469,12 @@ fun ScanScreen(bleViewModel: BleViewModel = viewModel()) {
 
                 Button(
                     onClick = {
-                        // [關鍵] 修改連線邏輯
                         if (isConnected) {
                             bleViewModel.disconnect()
                         } else {
                             savedDeviceAddress?.let { bleViewModel.connect(it) }
                         }
                     },
-                    // [關鍵] 如果沒存過裝置，禁用按鈕
                     enabled = savedDeviceAddress != null || isConnected,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isConnected) Color.Red else Color(0xFF4CAF50),
@@ -640,13 +667,12 @@ fun SettingsScreen(
     }
     val permissionsState = rememberMultiplePermissionsState(permissions = permissionsToRequest)
 
-    // ⬇️ [關鍵] 3. 在這裡加入 verticalScroll 讓整個畫面可以捲動
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1E1E1E))
             .padding(16.dp)
-            .verticalScroll(rememberScrollState()) // <--- 修正點在這裡
+            .verticalScroll(rememberScrollState())
     ) {
         Text(
             text = "一般設定",
@@ -755,12 +781,10 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("掃描到的裝置 (點擊以儲存並連線):", color = Color.White, fontWeight = FontWeight.Bold)
 
-                    // 這裡的 LazyColumn 不需要捲動，因為外層的 Column 已經在捲動了
-                    // 為了避免捲動衝突，我們改用 Column
                     Column(
                         modifier = Modifier
-                            .heightIn(max = 150.dp) // 限制最大高度
-                            .verticalScroll(rememberScrollState()) // 讓這個小列表自己捲動
+                            .heightIn(max = 150.dp)
+                            .verticalScroll(rememberScrollState())
                             .padding(top = 8.dp)
                     ) {
                         scannedDevices.forEach { result ->

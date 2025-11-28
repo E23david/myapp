@@ -111,23 +111,27 @@ class BleViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // 傳送資料
-    fun sendData(data: String) {
+    // 在 BleViewModel 類別中
+    fun sendIntData(value: Int) {
         if (bluetoothGatt == null || writeCharacteristic == null || !_isConnected.value) {
             return
         }
 
-        val dataBytes = data.toByteArray(Charsets.UTF_8)
-        writeCharacteristic?.value = dataBytes
+        // 轉成 4 Bytes (Little Endian 小端序)
+        // 這樣 STM32 讀起來會比較直覺
+        val dataBytes = ByteArray(4)
+        dataBytes[0] = (value and 0xFF).toByte()         // 數值低位
+        dataBytes[1] = ((value shr 8) and 0xFF).toByte() // 數值中位
+        dataBytes[2] = ((value shr 16) and 0xFF).toByte()// 數值高位
+        dataBytes[3] = ((value shr 24) and 0xFF).toByte()// ID (v3/v7)
 
-        // Android 13+ 需要這樣寫
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             bluetoothGatt?.writeCharacteristic(
                 writeCharacteristic!!,
                 dataBytes,
-                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             )
         } else {
-            // 舊版寫法
             bluetoothGatt?.writeCharacteristic(writeCharacteristic)
         }
     }

@@ -65,6 +65,11 @@ dependencies {
     implementation ("androidx.camera:camera-lifecycle:${camerax_version}")
     implementation ("androidx.camera:camera-view:${camerax_version}")
 
+    // ZXing Core (核心邏輯)
+    implementation("com.google.zxing:core:3.5.2")
+// ZXing Android Embedded (雖主要用於掃描，但有助於某些整合，若只想生成圖片用 core 其實就夠，但建議加上以防萬一)
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
 
 
 

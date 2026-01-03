@@ -2,6 +2,10 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+
+    // ⬇️ [新增] KSP 插件，Room 資料庫編譯需要它
+    // 注意：版本號建議對應你的 Kotlin 版本，這裡用較通用的版本
+    id("com.google.devtools.ksp") version "2.0.0-1.0.21"
 }
 
 android {
@@ -57,28 +61,35 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
+    // ML Kit 掃描
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
 
-    val camerax_version = "1.3.3" // 或是最新版本
-    implementation ("androidx.camera:camera-core:${camerax_version}")
-    implementation ("androidx.camera:camera-camera2:${camerax_version}")
-    implementation ("androidx.camera:camera-lifecycle:${camerax_version}")
-    implementation ("androidx.camera:camera-view:${camerax_version}")
+    // CameraX
+    val camerax_version = "1.3.3"
+    implementation("androidx.camera:camera-core:${camerax_version}")
+    implementation("androidx.camera:camera-camera2:${camerax_version}")
+    implementation("androidx.camera:camera-lifecycle:${camerax_version}")
+    implementation("androidx.camera:camera-view:${camerax_version}")
 
-    // ZXing Core (核心邏輯)
+    // ZXing (生成與處理條碼)
     implementation("com.google.zxing:core:3.5.2")
-// ZXing Android Embedded (雖主要用於掃描，但有助於某些整合，若只想生成圖片用 core 其實就夠，但建議加上以防萬一)
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
-
-
-
-// Material Icons (例如 Camera, Pause 等)
+    // Icons
     implementation("androidx.compose.material:material-icons-extended:1.6.7")
-// 或是最新版本
 
-
-    // 權限處理
+    // 權限與 ViewModel
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
+
+    // ⬇️⬇️⬇️ [這次新增的] ⬇️⬇️⬇️
+
+    // 1. Room 資料庫 (儲存記帳與地點)
+    val room_version = "2.6.1"
+    implementation("androidx.room:room-runtime:$room_version")
+    implementation("androidx.room:room-ktx:$room_version")
+    ksp("androidx.room:room-compiler:$room_version") // 使用 ksp 處理註解
+
+    // 2. MPAndroidChart (畫圓餅圖統計)
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 }
